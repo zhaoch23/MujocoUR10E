@@ -45,13 +45,15 @@ class HandTrackingSession:
                  env_wrapper: EnvironmentWrapper,
                  num_frames=100, 
                  framerate=30,
-                 control_scale=0.5,
+                 xy_scale=0.5,
+                 depth_scale=0.5,
                  control_timestep=0.2) -> None:
         self.camera = camera
         self.env_wrapper = env_wrapper
         self.num_frames = num_frames
         self.framerate = framerate
-        self.control_scale = control_scale
+        self.xy_scale = xy_scale
+        self.depth_scale = depth_scale
         self.control_timestep = control_timestep
         self.controls = []
         self.camera_frames = []
@@ -83,7 +85,18 @@ class HandTrackingSession:
 
                     if result and result.hand_lanmarks:
                         landmark = result.hand_landmarks[0][0]
-                        hand_pos = np.array([landmark.x, landmark.z, landmark.y])
+                        # x: normalized x coordinate of the landmark
+                        # y: normalized y coordinate of the landmark
+                        # z: normalized depth of the landmark relative to the wrist
+
+                        # Get z from the depth frame
+                        depth = depth_frame[int(landmark.y * depth_frame.shape[0]), int(landmark.x * depth_frame.shape[1])]
+
+                        hand_pos = np.array([
+                            landmark.x * self.xy_scale, 
+                            depth * self.xy_scale,
+                            landmark.y * self.xy_scale
+                            ])
                         
                         # Step the environment
                         ts = self.env_wrapper.step(hand_pos * self.control_scale)
@@ -103,3 +116,30 @@ class HandTrackingSession:
 
             except KeyboardInterrupt:
                 pass
+
+
+if __name__ == "__main__":
+    from cameras import WebCam
+    from rtde_connection import RTDEConnection
+
+    camera = WebCam()
+
+    connection = RTDEConnection("192.168.17.128") # Change this to the robot's IP
+
+    env_wrapper = EnvironmentWrapper(connection.get_actual_tcp_pose())
+
+    def callback(frames, ts, hand_pos, joint_pose):
+        color_frame, depth_frame = frames
+        cv2.imshow("Color Frame", color_frame)
+        cv2.imshow("Depth Frame", depth_frame)
+        cv2.imshow("Birdview", ts.observation['images']['birdview'])
+        connection.servoL(joint_pose)
+        print(f"Hand Position: {hand_pos}")
+        print(f"Joint Pose: {joint_pose}")
+
+    session = HandTrackingSession(camera, env_wrapper)
+    session.start(callback)
+
+    env_wrapper.close()
+
+    cv2.destroyAllWindows()

@@ -60,4 +60,5 @@ class WebCam(BaseCamera):
         if not ret:
             print("Error: Failed to capture frame")
             return None, None
-        return frame, None
+        
+        return frame, np.zeros_like(frame)

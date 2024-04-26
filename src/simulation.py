@@ -11,18 +11,19 @@ from constants import *
 
 class SimTask(base.Task):
 
-    def __init__(self, random=None):
+    def __init__(self, init_pos, random=None):
         super(SimTask, self).__init__(random=random)
+
+        self.init_pos = init_pos
 
         self.init_mocap_pos = None
         self.init_mocap_quat = None
-        self.init_mocap_qpos = None
         self.simulation_frames = None
 
     def initialize_episode(self, physics):
         with physics.reset_context():
-            physics.named.data.qpos[:6] = UR10E_START_POS
-            np.copyto(physics.data.ctrl, UR10E_START_POS)
+            physics.named.data.qpos[:6] = self.init_pos
+            np.copyto(physics.data.ctrl, self.init_pos)
         
         np.copyto(physics.data.mocap_pos[0], physics.named.data.xpos['wrist_3_link'])
         np.copyto(physics.data.mocap_quat[0], physics.named.data.xquat['wrist_3_link'])
@@ -54,10 +55,10 @@ class SimTask(base.Task):
         return joint_poses
     
     @staticmethod
-    def get_env(control_timestamp_sec=0.02):
+    def get_env(init_pos, control_timestamp_sec=0.02):
         physics = mujoco.Physics.from_xml_path(SCENE_XML_PATH)
 
-        task = SimTask()
+        task = SimTask(init_pos)
         env = control.Environment(
             physics, task, time_limit=10., control_timestep=control_timestamp_sec,
             n_sub_steps=None, flat_observation=None)
@@ -66,8 +67,8 @@ class SimTask(base.Task):
 
 class EnvironmentWrapper:
 
-    def __init__(self, control_timestamp_sec=0.02):
-        self.env = SimTask.get_env(control_timestamp_sec)
+    def __init__(self, init_pos, control_timestamp_sec=0.02):
+        self.env = SimTask.get_env(init_pos, control_timestamp_sec)
 
         self.init_mocap_pos = None
         self.init_mocap_quat = None
