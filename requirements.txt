@@ -1,2 +1,7 @@
 mediapipe==0.10.9
 dm_control
+ur-rtde
+opencv-python
+matplotlib
+cython
+pyrealsense
